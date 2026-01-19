@@ -32,5 +32,17 @@ lightning_logs/
 *.safetensors
 *.onnx
 
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
 # Logs
 *.log
+# Logs and artifacts (optional - keep if you want to preserve them)
+lightning_logs/
+artifacts/
