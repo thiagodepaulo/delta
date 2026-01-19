@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Env / secrets
+.venv/
+.env
+*.key
+*.pem
+
+# Editors
+.vscode/
+.ipynb_checkpoints/
+
+# Data & experiment outputs
+data/
+artifacts/
+outputs/
+runs/
+wandb/
+mlruns/
+tensorboard/
+lightning_logs/
+
+# Model files
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+
+# Logs
+*.log

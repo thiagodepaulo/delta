@@ -1,0 +1,64 @@
+prism:
+  dts_name: prism
+  dts_path: /home/thiagodepaulo/exp/delta/torch_data/prism
+
+  prefix_columns: ["preference__", "english_proficiency__", "marital__", "education__", "employment__", "age__", "gender__"]
+
+  train: 
+    df_file: df_train.parquet
+    text_file: texts_train.json
+    emb_file: emb_train.npy
+
+  dev:
+    df_file: df_eval.parquet
+    text_file: texts_eval.json
+    emb_file: emb_eval.npy
+  
+  test:
+    df_file: df_test_seen.parquet    
+    text_file: texts_test_seen.json
+    emb_file: emb_test_seen.npy
+
+  test_unseen:
+    df_file: df_test_unseen.parquet
+    text_file: texts_test_unseen.json
+    emb_file: emb_test_unseen.npy
+
+psoup:
+  dts_name: psoup
+  dts_path: /home/thiagodepaulo/exp/delta/torch_data/psoup
+
+  train:
+    df_file: psoup_train.parquet
+    text_file: texts_train.json
+    emb_file: emb_train.npy
+
+  dev:
+    df_file: psoup_dev.parquet
+    text_file: texts_dev.json
+    emb_file: emb_dev.npy
+
+  test:
+    df_file: psoup_test.parquet   
+    text_file: texts_test.json
+    emb_file: emb_test.npy
+
+simpler:
+  dts_name: simpler
+  dts_path: /home/thiagodepaulo/exp/delta/data/simpler
+  dts_file: /home/thiagodepaulo/exp/delta/data/simpler/dataset_pairwise_preferences.jsonl
+
+  train: 
+    df_file: df_train.jsonl
+    text_file: texts_train.json
+    emb_file: emb_train.npy
+
+  dev:
+    df_file: df_dev.jsonl
+    text_file: texts_dev.json
+    emb_file: emb_dev.npy
+
+  test:
+    df_file: df_test.jsonl
+    text_file: texts_test.json
+    emb_file: emb_test.npy

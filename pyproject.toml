@@ -1,0 +1,13 @@
+[project]
+name = "delta"
+version = "0.1.0"
+description = "Machine learning experiments"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pyyaml",
+  "numpy",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
