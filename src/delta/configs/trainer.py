@@ -11,7 +11,7 @@ class TrainerConfig(BaseModel):
     
     scheduler: str = "none"
     
-    num_workers: int    
+    num_workers: int = 2
     
 
     # Optimizer
@@ -22,6 +22,9 @@ class TrainerConfig(BaseModel):
     
     betas: Tuple[float, float]
     eps: float = 1e-8
+    
+    warmup_steps: Optional[int] = -1  # if -1, will use 5% of total steps
+    min_lr: Optional[float] = 1e-6
     
     #second_optimizer: str = "SGD"
     #second_learning_rate: float = 5e-4

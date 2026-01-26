@@ -2,7 +2,7 @@ from typing import Optional, Tuple
 from pydantic import BaseModel
 
 
-class Model1Config(BaseModel):
+class Model2Config(BaseModel):
     
     n_dim: int
     # Number of users
@@ -23,7 +23,7 @@ class Model1Config(BaseModel):
 
     has_user_features: bool = False
 
-    # Model1 regularization hyperparameters
+    # Model2 regularization hyperparameters
     lambda_r : float #= 1e-6
     lambda_x : float #= 1e-6
     lambda_y : float #= 1e-6

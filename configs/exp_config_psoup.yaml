@@ -14,7 +14,7 @@ trainer:
 
 caimira:
   n_dim: 5
-  n_users: 1500
+  n_users: 6
   n_dim_user_embed: 1536  
   n_dim_item_embed: 1536
   lambda_s : 1e-6
@@ -27,7 +27,7 @@ model1:
   n_dim_user_embed: 1536
   n_dim_user_embed_2: 3
   n_dim_user_features: 45
-  n_users: 1500
+  n_users: 6
   lambda_x: 1e-6
   lambda_y: 1e-6
   lambda_r: 1e-6
@@ -41,7 +41,7 @@ model2:
   n_dim_user_embed: 1536
   n_dim_user_embed_2: 16
   n_dim_user_features: 45
-  n_users: 1500
+  n_users: 6
   lambda_x: 1e-5
   lambda_y: 1e-5
   lambda_r: 1e-5

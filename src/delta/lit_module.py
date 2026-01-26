@@ -79,11 +79,17 @@ class PrefModule(L.LightningModule):
         self._log_split("val", log)        
         return loss
     
+    def on_train_epoch_start(self):
+        opt = self.optimizers()
+        lr = opt.param_groups[0]["lr"]
+        print(f"Epoch {self.current_epoch} | LR = {lr:.6e}")
+
+    
     def _log_split(self, split: str, log: Dict[str, torch.Tensor]):
         self.log(f"{split}_loss", log["loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log(f"{split}_acc", log["acc"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log(f"{split}_acc_r_star", log["acc_r_star"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log(f"{split}_acc_delta", log["acc_delta"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f"{split}_acc_r_star", log["acc_r_star"], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+        self.log(f"{split}_acc_delta", log["acc_delta"], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
         self.log(f"{split}_bt_loss", log["bt_loss"], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
         self.log(f"{split}_reg_loss", log["reg_loss"], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
 
@@ -142,6 +148,10 @@ class PrefModule(L.LightningModule):
             # Optionally do warmup manually via LambdaLR.
             total_steps = self.trainer.estimated_stepping_batches
 
+            warmup_steps = getattr(self.hparams, "warmup_steps", -1)
+            if warmup_steps < 0:
+                warmup_steps = int(0.05 * total_steps)  # 5% warmup
+            self.hparams.warmup_steps = warmup_steps
             def lr_lambda(step: int):
                 if self.hparams.warmup_steps > 0 and step < self.hparams.warmup_steps:
                     return float(step) / float(max(1, self.hparams.warmup_steps))
@@ -185,8 +195,10 @@ class PrefDataModule(L.LightningDataModule):
     def setup(self, stage: str):
         dts = create_torch_dataset(self.args.dts_config_file, self.args.dts_name)
         self.train_dataset = dts['train']
-        self.val_dataset = dts['dev']
         self.test_seen_dataset = dts['test']
+        self.val_dataset = None
+        if 'dev' in dts.keys():
+            self.val_dataset = dts['dev']        
         self.test_unseen_dataset = None
         if 'test_unseen' in dts.keys():
             self.test_unseen_dataset = dts['test_unseen']        
@@ -195,6 +207,8 @@ class PrefDataModule(L.LightningDataModule):
         return DataLoader(self.train_dataset, batch_size=self.args.batch_size, shuffle=True)
     
     def val_dataloader(self):
+        if self.val_dataset is None:
+            return DataLoader(self.test_seen_dataset, batch_size=self.args.batch_size, shuffle=False)
         return DataLoader(self.val_dataset, batch_size=self.args.batch_size, shuffle=False)
     
     def test_dataloader(self):

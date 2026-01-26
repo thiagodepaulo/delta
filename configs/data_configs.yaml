@@ -1,6 +1,6 @@
 prism:
   dts_name: prism
-  dts_path: /home/thiagodepaulo/exp/delta/torch_data/prism
+  dts_path: /home/thiagodepaulo/exp/delta/data/prism
 
   prefix_columns: ["preference__", "english_proficiency__", "marital__", "education__", "employment__", "age__", "gender__"]
 
@@ -26,20 +26,15 @@ prism:
 
 psoup:
   dts_name: psoup
-  dts_path: /home/thiagodepaulo/exp/delta/torch_data/psoup
+  dts_path: /home/thiagodepaulo/exp/delta/data/psoup
 
   train:
-    df_file: psoup_train.parquet
+    df_file: psoup_train_with_emb_uid.parquet
     text_file: texts_train.json
-    emb_file: emb_train.npy
-
-  dev:
-    df_file: psoup_dev.parquet
-    text_file: texts_dev.json
-    emb_file: emb_dev.npy
+    emb_file: emb_train.npy  
 
   test:
-    df_file: psoup_test.parquet   
+    df_file: psoup_test_with_emb_uid.parquet   
     text_file: texts_test.json
     emb_file: emb_test.npy
 

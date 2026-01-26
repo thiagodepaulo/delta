@@ -35,8 +35,10 @@ class Model1(BaseDeltaModel):
             self.ln_u = nn.LayerNorm(config.n_dim)            
         
         # user 
-        self.layer_r = nn.Embedding(self.config.n_users, self.config.n_dim)
-        self.layer_r.weight.data.normal_(0, 0.001)
+        self.user_id = nn.Embedding(self.config.n_users, self.config.n_dim_user_embed_2)
+        self.user_id.weight.data.normal_(0, 0.001)
+        
+        self.W_id = nn.Linear(self.config.n_dim_user_embed_2, self.config.n_dim, bias=False)
         
         self.drop = nn.Dropout(p=0.1)
         
@@ -59,7 +61,10 @@ class Model1(BaseDeltaModel):
             f_u = self.ln_u(self.W_u(user_features))
             f_x = f_x * f_u
 
-        r_u = self.layer_r(user_u.long())          # [B, D]
+        r_u = self.user_id(user_u.long())          
+        r_u = self.W_id(r_u)                       
+        r_u = self.drop(r_u)
+        
         logits = (f_x * r_u * f_y).sum(dim=-1) / math.sqrt(self.config.n_dim) #* self.scale
         return {"logits": logits}
     
@@ -69,7 +74,7 @@ class Model1(BaseDeltaModel):
             loss_reg_u = self.config.lambda_u * self.W_u.weight.abs().sum()
         loss_reg_x = self.config.lambda_x * self.W_x.weight.abs().sum()
         loss_reg_y = self.config.lambda_y * self.W_y.weight.abs().sum()
-        loss_reg_r = self.config.lambda_r * self.layer_r.weight.abs().sum()
+        loss_reg_r = self.config.lambda_r * self.W_id.weight.abs().sum()
         
         logs = {
             "loss_reg_x": loss_reg_x,
