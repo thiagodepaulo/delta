@@ -28,15 +28,19 @@ psoup:
   dts_name: psoup
   dts_path: /home/thiagodepaulo/exp/delta/data/psoup
 
+  vocab_file: vocab.txt
+
   train:
     df_file: psoup_train_with_emb_uid.parquet
     text_file: texts_train.json
     emb_file: emb_train.npy  
+    bow_file: bow_train.npy
 
   test:
     df_file: psoup_test_with_emb_uid.parquet   
     text_file: texts_test.json
     emb_file: emb_test.npy
+    bow_file: bow_test.npy
 
 simpler:
   dts_name: simpler

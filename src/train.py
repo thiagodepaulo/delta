@@ -8,10 +8,9 @@ from delta.lit_module import PrefModule, PrefDataModule
 from delta.utils.config_utils import load_config
 from delta.configs.trainer import TrainerConfig
 from delta.reward_models.zero_rw import ZeroRWModel
-
 from delta.reward_models.map_rw import MapRWModel
-
 import time    
+
     
 def main(args):
     parser = argparse.ArgumentParser(description="Train a model")    
@@ -26,6 +25,7 @@ def main(args):
     parser.add_argument("--features", type=str, default=None, help="Feature columns to use, 'all' for all features")
     parser.add_argument("--patience", type=int, default=10**9, help="Early stopping patience")
     parser.add_argument("--n_dim", type=int, default=50, help="Number of dimensions")
+    parser.add_argument("--has_bow", action='store_true', default=False, help="Whether to use BOW embeddings")
     args = parser.parse_args()
     
     logger = TensorBoardLogger(
@@ -40,6 +40,9 @@ def main(args):
     rwModel = create_rw_model(args, config_dict)            
     model_instance = create_model(args, config_dict)
     
+    args.batch_size = trainer_config.batch_size  # Ensure batch size is consistent
+    args.has_bow = True
+    print(args.has_bow)
     data_module = PrefDataModule(args)
     model = PrefModule(trainer_config, model_instance, rwModel)
     

@@ -7,6 +7,7 @@ class SplitFiles(BaseModel):
     df_file: Optional[str] = None
     text_file: Optional[str] = None
     emb_file: Optional[str] = None
+    bow_file: Optional[str] = None
 
 class DatasetConfig(BaseModel):
     
@@ -19,6 +20,8 @@ class DatasetConfig(BaseModel):
     test_unseen: Optional[SplitFiles] = None    
     
     prefix_columns: Optional[list[str]] = None
+    
+    vocab_file: Optional[str] = None    
     
     @property
     def arch(self):

@@ -16,7 +16,8 @@ build/
 .ipynb_checkpoints/
 
 # Data & experiment outputs
-data/
+data/prism/
+data/psoup/
 artifacts/
 outputs/
 runs/

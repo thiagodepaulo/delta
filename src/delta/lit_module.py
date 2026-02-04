@@ -8,8 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 from delta.configs.trainer import TrainerConfig
 from delta.models.base import BaseDeltaModel
 from delta.reward_models.base import BaseRewardModel
-from delta.configs.dataset import DatasetConfig
-from delta.utils.dataset_utils import create_torch_dataset
+from delta.data.dataset import create_torch_dataset
 
 class PrefModule(L.LightningModule):
 
@@ -193,7 +192,7 @@ class PrefDataModule(L.LightningDataModule):
         self.args = args    
         
     def setup(self, stage: str):
-        dts = create_torch_dataset(self.args.dts_config_file, self.args.dts_name)
+        dts = create_torch_dataset(self.args)
         self.train_dataset = dts['train']
         self.test_seen_dataset = dts['test']
         self.val_dataset = None
