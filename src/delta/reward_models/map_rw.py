@@ -26,7 +26,9 @@ class MapRWModel(BaseRewardModel):
         else:
             raise ValueError(f"Unknown dataset name: {dataset_name}")
         
-    def forward(self, x, y, split=None):
+    def forward(self, batch, split=None):
+        x = batch['prompt_emb']
+        y = batch['answer_emb'] 
         rw_values = [self.reward_map[xi + yi] for xi, yi in zip(x, y)]
         return torch.tensor(rw_values, device=self._device_ref.device)                  
         

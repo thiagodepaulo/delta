@@ -5,8 +5,8 @@ from pydantic import BaseModel
 class CaimiraConfig(BaseModel):
     
     # Caimira regularization hyperparameters
-    lambda_s : float #= 1e-6
-    lambda_d : float #= 1e-6
+    lambda_s : float = 1e-6
+    lambda_d : float = 1e-6
     
     n_dim: int
     # Number of users

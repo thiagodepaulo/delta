@@ -25,15 +25,11 @@ class CaimiraModel(BaseDeltaModel):
         self.layer_s = nn.Embedding(self.config.n_users, self.config.n_dim)
         self.layer_s.weight.data.normal_(0, 0.001)
 
-    def forward(
-            self,
-            *,
-            user_u: Optional[Tensor] = None,
-            prompt_x: Optional[Tensor] = None,
-            answer_y: Optional[Tensor] = None,
-            **kwargs: Any,
-        ):        
+    def forward(self, batch):
         
+        user_u = batch['u_id']
+        answer_y = batch['answer_emb']
+                
         # item difficulty
         d_raw = self.layer_d(answer_y)  # item difficulty
         d_norm = d_raw - d_raw.mean(dim=0)
@@ -48,7 +44,13 @@ class CaimiraModel(BaseDeltaModel):
         latent_score = (s - d_norm)
         logits = torch.einsum("bn,bn->b", latent_score, r_norm)
         
-        return {'logits': logits, 's': s, 'd': d_norm, 'r': r_norm}
+        loss_reg_s = self.config.lambda_s * self.layer_s.weight.abs().sum()
+        loss_reg_d = self.config.lambda_d * self.layer_d.weight.abs().sum()
+        reg_loss = loss_reg_s + loss_reg_d
+        
+        rec_loss = torch.tensor(0.0)  # no reconstruction loss in this model        
+        
+        return {'logits': logits, 's': s, 'd': d_norm, 'r': r_norm, 'reg_loss': reg_loss, 'recon_loss': rec_loss}
 
     def compute_regularization( self ) :
         

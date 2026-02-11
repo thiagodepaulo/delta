@@ -18,7 +18,7 @@ class PrefModule(L.LightningModule):
         self.delta_model = delta_model
         
         self.r_star_model = r_star_model
-        self.r_star_model.eval()
+        #self.r_star_model.eval()
         for p in self.r_star_model.parameters():
             p.requires_grad = False
         
@@ -26,86 +26,111 @@ class PrefModule(L.LightningModule):
         self.save_hyperparameters(argparse.Namespace(**trainer_config.model_dump()))
         
     def compute_loss(self, batch):
-        
-        u, x, y_w, y_l = batch['u_id'].long(), batch['prompt_emb'], batch['chosen_emb'], batch['rejected_emb']
-        text_x = batch['prompt']
-        text_y_w = batch['chosen']
-        text_y_l = batch['rejected']
-        user_features = batch.get('features', None)
+                
+        batch_w = batch["chosen"]
+        batch_l = batch["rejected"]                
         
         with torch.no_grad():
-            out_r_star_w = self.r_star_model(text_x, text_y_w)
-            out_r_star_l = self.r_star_model(text_x, text_y_l)
-        
-        out_delta_w = self.delta_model(user_u=u, answer_y=y_w, prompt_x=x, user_features=user_features)
-        out_delta_l = self.delta_model(user_u=u, answer_y=y_l, prompt_x=x, user_features=user_features)
-        
+            out_r_star_w = self.r_star_model(batch_w)
+            out_r_star_l = self.r_star_model(batch_l)
         diff_r_star = out_r_star_w - out_r_star_l
+        
+        out_delta_w = self.delta_model(batch_w)        
+        out_delta_l = self.delta_model(batch_l)
+                
+        recon_loss = (out_delta_w['loss'] + out_delta_l['loss'])
+        nl_loss = (out_delta_w['nl_loss'] + out_delta_l['nl_loss'])
+        ll_loss = (out_delta_w['ll_loss'] + out_delta_l['ll_loss'])
+        kld_loss = (out_delta_w['kld_loss'] + out_delta_l['kld_loss'])
+                          
         diff_delta = out_delta_w["logits"] - out_delta_l["logits"]
         z = diff_r_star + diff_delta
-        
-        bt_loss = F.softplus(-z).mean()  
-        
-        total_reg_loss, log_reg = self.delta_model.compute_regularization()
+        bt_loss = F.softplus(-z).mean()
         
         # total loss
-        loss = bt_loss + total_reg_loss
-        
+        loss = (bt_loss + ll_loss) + (nl_loss + kld_loss)
+              
         # accuracy
         acc = (z > 0).float().mean()
         acc_r_star = (diff_r_star > 0).float().mean()
         acc_delta = (diff_delta > 0).float().mean()
         
         log = {       
-            "loss": loss.mean(),                 
-            "bt_loss": bt_loss.mean(),
-            "reg_loss": total_reg_loss.mean(),
+            "loss": loss,                       
+            "bt_loss": bt_loss,
+            "recon_loss": recon_loss,            
+            "nl_loss": nl_loss,
+            "ll_loss": ll_loss,
+            "kld_loss": kld_loss,
             "acc": acc,
             "acc_r_star": acc_r_star,
-            "acc_delta": acc_delta,
-            **log_reg
+            "acc_delta": acc_delta,            
         } 
         
         return loss.mean(), log
     
-    def training_step(self, batch):        
-        loss, log = self.compute_loss(batch)                
-        self._log_split("train", log)        
+    def split_batch_for_pref(self, batch):
+        batch_w = {}
+        batch_l = {}
+        for k, v in batch.items():
+            if k.startswith("chosen_"):
+                new_k = "answer_" + k[len("chosen_") :]
+                batch_w[new_k] = v
+            elif k.startswith("rejected_"):
+                new_k = "answer_" + k[len("rejected_") :]
+                batch_l[new_k] = v
+            else:
+                batch_w[k] = v
+                batch_l[k] = v
+        return {"chosen": batch_w, "rejected": batch_l}
+    
+    def training_step(self, batch):      
+        batch_wl = self.split_batch_for_pref(batch)
+        
+        loss, log = self.compute_loss(batch_wl)    
+        bs = batch["u_id"].shape[0] if isinstance(batch, dict) and "u_id" in batch else 1
+        self._log_split("train", log, batch_size=bs)            
         return loss
     
     def validation_step(self, batch):        
-        loss, log = self.compute_loss(batch)
-        self._log_split("val", log)        
+        batch_wl = self.split_batch_for_pref(batch)
+        loss, log = self.compute_loss(batch_wl)
+        bs = batch["u_id"].shape[0] if isinstance(batch, dict) and "u_id" in batch else 1
+        self._log_split("val", log, batch_size=bs)        
         return loss
     
     def on_train_epoch_start(self):
         opt = self.optimizers()
         lr = opt.param_groups[0]["lr"]
         print(f"Epoch {self.current_epoch} | LR = {lr:.6e}")
-
     
-    def _log_split(self, split: str, log: Dict[str, torch.Tensor]):
-        self.log(f"{split}_loss", log["loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+    def _log_split(self, split: str, log: Dict[str, torch.Tensor], batch_size: Optional[int] = None):
+        self.log(f"{split}_loss", log["loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, batch_size=batch_size)
         self.log(f"{split}_acc", log["acc"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log(f"{split}_acc_r_star", log["acc_r_star"], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
         self.log(f"{split}_acc_delta", log["acc_delta"], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-        self.log(f"{split}_bt_loss", log["bt_loss"], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-        self.log(f"{split}_reg_loss", log["reg_loss"], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+        self.log(f"{split}_bt_loss", log["bt_loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)        
+        self.log(f"{split}_recon_loss", log["recon_loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f"{split}_ll_loss", log["ll_loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f"{split}_nl_loss", log["nl_loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f"{split}_kld_loss", log["kld_loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
     def on_test_epoch_start(self):
-        # 0 -> test, 1 -> test_unseen
+        # 0 -> test, 1 -> test_unseen        
         self.test_acc_sum = [torch.tensor(0.0, device=self.device),
                              torch.tensor(0.0, device=self.device)]
         self.test_n = [torch.tensor(0.0, device=self.device),
                        torch.tensor(0.0, device=self.device)]
             
     def test_step(self, batch, batch_idx: int, dataloader_idx: int = 0):
-        loss, log = self.compute_loss(batch)                 
+        batch_wl = self.split_batch_for_pref(batch)
+        loss, log = self.compute_loss(batch_wl)                 
         
        # log separado por split
         split_name = "test" if dataloader_idx == 0 else "test_unseen"
-        self.log(f"{split_name}_loss", log["loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log(f"{split_name}_acc", log["acc"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        bs = batch["u_id"].shape[0] if isinstance(batch, dict) and "u_id" in batch else 1
+        self.log(f"{split_name}_loss", log["loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, batch_size=bs)
+        self.log(f"{split_name}_acc", log["acc"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, batch_size=bs)
 
         # acumula média manual (ponderada por batch size)
         bs = batch["u_id"].shape[0] if isinstance(batch, dict) and "u_id" in batch else 1
@@ -183,13 +208,16 @@ class PrefModule(L.LightningModule):
             return {"optimizer": opt, "lr_scheduler": {"scheduler": sch, "monitor": "val_loss"}}
 
         raise ValueError(f"Unknown scheduler: {self.hparams.scheduler}")
-        
+    
+    def get_device(self, batch) -> str:
+        """Retrieve device currently being used by minibatch."""
+        return batch[0].device.index if self.on_gpu else "cpu"
 
 class PrefDataModule(L.LightningDataModule):
     
     def __init__(self, args):
         super().__init__()
-        self.args = args    
+        self.args = args            
         
     def setup(self, stage: str):
         dts = create_torch_dataset(self.args)
@@ -200,24 +228,30 @@ class PrefDataModule(L.LightningDataModule):
             self.val_dataset = dts['dev']        
         self.test_unseen_dataset = None
         if 'test_unseen' in dts.keys():
-            self.test_unseen_dataset = dts['test_unseen']        
+            self.test_unseen_dataset = dts['test_unseen']     
+            
+        if self.args.model_name == 'ntm': 
+            from delta.data.dataset import load_vocab
+        
+            self.args.vocab = load_vocab(self.args.dts_config_file, self.args.dts_name)
+            print(f"Loaded vocab with {len(self.args.vocab)} tokens for NTM model")
+            
+            self.args.vocab_size = len(self.args.vocab)
+            self.args.n_features = dts['train'].n_features
+            self.args.feature_columns = dts['train'].feature_columns
     
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.args.batch_size, shuffle=True)
+        return DataLoader(self.train_dataset, batch_size=self.args.batch_size, shuffle=True, num_workers=self.args.num_workers)
     
     def val_dataloader(self):
         if self.val_dataset is None:
-            return DataLoader(self.test_seen_dataset, batch_size=self.args.batch_size, shuffle=False)
-        return DataLoader(self.val_dataset, batch_size=self.args.batch_size, shuffle=False)
+            return DataLoader(self.test_seen_dataset, batch_size=self.args.batch_size, shuffle=False, num_workers=self.args.num_workers)
+        return DataLoader(self.val_dataset, batch_size=self.args.batch_size, shuffle=False, num_workers=self.args.num_workers)
     
     def test_dataloader(self):
-        test_loaders = [DataLoader(self.test_seen_dataset, batch_size=self.args.batch_size, shuffle=False)]
+        test_loaders = [DataLoader(self.test_seen_dataset, batch_size=self.args.batch_size, shuffle=False, num_workers=self.args.num_workers)]
         if self.test_unseen_dataset is not None:
-            test_loaders.append(DataLoader(self.test_unseen_dataset, batch_size=self.args.batch_size, shuffle=False))
+            test_loaders.append(DataLoader(self.test_unseen_dataset, batch_size=self.args.batch_size, shuffle=False, num_workers=self.args.num_workers))
         return test_loaders
-
-
-if __name__ == "__main__":
-    lit_module = PrefModule()    
-    
-    
+        
+        

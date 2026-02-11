@@ -4,5 +4,5 @@ class BaseRewardModel(nn.Module):
     def __init__(self):
         super().__init__()
             
-    def forward(self, x, y):
+    def forward(self, batch):
         raise NotImplementedError    

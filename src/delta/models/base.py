@@ -17,14 +17,7 @@ class BaseDeltaModel(nn.Module):
     def save_pretrained(self, path: str):
         raise NotImplementedError
         
-    def forward(
-        self,
-        *,
-        user_u: Optional[Tensor] = None,
-        prompt_x: Optional[Tensor] = None,
-        answer_y: Optional[Tensor] = None,
-        **kwargs: Any,
-    ) :
+    def forward(self, batch) :
         """
         General interface for delta models.
 

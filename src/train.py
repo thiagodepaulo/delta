@@ -9,6 +9,9 @@ from delta.utils.config_utils import load_config
 from delta.configs.trainer import TrainerConfig
 from delta.reward_models.zero_rw import ZeroRWModel
 from delta.reward_models.map_rw import MapRWModel
+from delta.callbacks import BetaCallBack, PrintNTMTopics
+from delta.models.ntm import NTMModel
+from delta.configs.ntm import NTMConfig
 import time    
 
     
@@ -26,6 +29,9 @@ def main(args):
     parser.add_argument("--patience", type=int, default=10**9, help="Early stopping patience")
     parser.add_argument("--n_dim", type=int, default=50, help="Number of dimensions")
     parser.add_argument("--has_bow", action='store_true', default=False, help="Whether to use BOW embeddings")
+    parser.add_argument("--print_topics", action='store_true', default=True, help="Whether to print NTM topics during training")
+    parser.add_argument("--print_topics_every_n_epochs", type=int, default=1, help="How often to print NTM topics during training (in epochs)")
+    parser.add_argument("--num_workers", type=int, default=4, help="Number of workers for data loading")
     args = parser.parse_args()
     
     logger = TensorBoardLogger(
@@ -36,26 +42,24 @@ def main(args):
             
     config_dict = load_config(args.config_file)
     trainer_config = TrainerConfig(**config_dict["trainer"])    
-    
-    rwModel = create_rw_model(args, config_dict)            
-    model_instance = create_model(args, config_dict)
-    
+        
     args.batch_size = trainer_config.batch_size  # Ensure batch size is consistent
     args.has_bow = True
-    print(args.has_bow)
-    data_module = PrefDataModule(args)
+    
+    data_module = PrefDataModule(args)    
+    data_module.setup('fit')  # Ensure datasets are loaded before creating the model, in case vocab is needed for NTM
+    
+    rwModel = create_rw_model(args, config_dict)            
+    model_instance = create_model(args, config_dict)    
+    
     model = PrefModule(trainer_config, model_instance, rwModel)
     
-    early_stop = EarlyStopping(
-        monitor="val_loss",   # metric name
-        patience=args.patience,           # epochs with no improvement
-        mode="min",           # "min" for loss, "max" for accuracy
-    )    
+    callbacks = create_callbacks(args)
     
     trainer = L.Trainer(
         max_epochs=trainer_config.max_epochs,
         logger=logger,
-        callbacks=[early_stop]
+        callbacks=callbacks
     ) 
     trainer.fit(model, datamodule=data_module)
         
@@ -85,6 +89,15 @@ def create_model(args, config_dict):
         model2_config = Model2Config(**config_dict["model2"])
         model2_config.n_dim = args.n_dim
         model_instance = Model2(model2_config)
+    elif args.model_name == 'ntm':        
+
+        ntm_config = NTMConfig(**config_dict["ntm"])   
+        
+        ntm_config.vocab_size = args.vocab_size  # Set vocab size from loaded vocab     
+        ntm_config.n_topic_covars = args.n_features
+        ntm_config.topic_covar_names = args.feature_columns
+        #ntm_config.n_labels = 2  # Binary classification (preferred vs non-preferred)
+        model_instance = NTMModel(ntm_config)
     else:
         raise ValueError(f"Unknown model name: {args.model_name}")
     
@@ -99,6 +112,23 @@ def create_rw_model(args, config_dict=None):
         raise ValueError(f"Unknown reward model name: {args.rw_model_name}")
     return rwModel
 
+def create_callbacks(args):
+    callbacks = []
+    if args.model_name == 'ntm' and args.print_topics:       
+        print(f"Adding PrintNTMTopics callback with vocab size {len(args.vocab)} and print frequency {args.print_topics_every_n_epochs} epochs")                         
+        callbacks.append(PrintNTMTopics(vocab=args.vocab, every_n_epochs=args.print_topics_every_n_epochs))
+        
+        print("Eta Callback added to adjust eta_bn_prop during training")
+        callbacks.append(BetaCallBack())
+    
+    early_stop = EarlyStopping(
+        monitor="val_loss",   # metric name
+        patience=args.patience,           # epochs with no improvement
+        mode="min",           # "min" for loss, "max" for accuracy
+    )    
+            
+    callbacks.append(early_stop)
+    return callbacks
             
 if __name__ == "__main__":
     main(sys.argv[1:])

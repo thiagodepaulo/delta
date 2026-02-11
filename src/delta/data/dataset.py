@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 import json
+from scipy import sparse
 
 
 SPLITS = ['train', 'dev', 'test', 'test_unseen']
@@ -32,10 +33,16 @@ class PreferenceDataset(Dataset):
                  emb_columns_idx= DEFAULT_EMB_COLUMNS_IDX, 
                  bow_columns_idx= DEFAULT_BOW_COLUMNS_IDX,
                  feature_columns=[], 
-                 prefix_columns=[]
+                 prefix_columns=[],
+                 split="train"
                 ):        
-        self.df = df                
-        self.bow_embeddings = bow_embeddings     
+        self.df = df                        
+        self.split = split
+        
+        self.bow_embeddings = bow_embeddings
+        self.is_bow_sparse = sparse.issparse(bow_embeddings) if bow_embeddings is not None else False
+
+        self.bow_columns_idx = bow_columns_idx if bow_embeddings is not None else None
         
         assert all(col in self.df.columns for col in required_columns), "DataFrame is missing required columns"
         if feature_columns:
@@ -50,9 +57,13 @@ class PreferenceDataset(Dataset):
         
         self.features = None
         if feature_columns or prefix_columns:
-            feature_columns = feature_columns + prefix_columns
+            feature_columns = feature_columns + prefix_columns            
             self.features = self.df[feature_columns].to_numpy().astype(np.float32)
             self.features = torch.tensor(self.features, dtype=torch.float)
+            self.n_features = self.features.shape[1]
+            self.feature_columns = feature_columns
+            print(f"Using {self.n_features} features columns: {self.feature_columns}")
+            
                 
         self.embeddings_map = {}        
         for k, idxs in emb_columns_idx.items():
@@ -61,8 +72,9 @@ class PreferenceDataset(Dataset):
         self.bow_embeddings_map = {}        
         if bow_columns_idx and bow_embeddings is not None:
             for k, idxs in bow_columns_idx.items():
-                self.bow_embeddings_map[k] = bow_embeddings[self.df[idxs]]
-                #self.bow_embeddings_map[k] = torch.tensor(bow_embeddings[self.df[idxs]], dtype=torch.float)
+                # Store indices for sparse, or convert to dense for small data
+                self.bow_embeddings_map[k] = self.df[idxs].values
+        
                     
     def __len__(self):
         return len(self.df)
@@ -83,9 +95,19 @@ class PreferenceDataset(Dataset):
         for k in self.embeddings_map:
             item[k] = self.embeddings_map[k][idx]        
         
-        if not self.bow_embeddings_map:
+        if self.bow_embeddings_map:
             for k in self.bow_embeddings_map:
-                item[k] = torch.tensor(self.bow_embeddings_map[k][idx], dtype=torch.float)
+                bow_idx = self.bow_embeddings_map[k][idx]
+                if self.is_bow_sparse:
+                    # Convert sparse row to dense tensor
+                    bow_vector = self.bow_embeddings[bow_idx].toarray().squeeze()
+                else:
+                    bow_vector = self.bow_embeddings[bow_idx]
+                item[k] = torch.tensor(bow_vector, dtype=torch.float)
+                
+        ## create y labels for preferred (chosen) vs non-preferred (rejected)        
+        item['chosen_label'] = torch.tensor([1.0], dtype=torch.float) if self.split == "train" else torch.zeros(1)  # Preferred (chosen) is labeled as 1
+        item['rejected_label'] = torch.tensor([0.0], dtype=torch.float) if self.split == "train" else torch.zeros(1)  # Non-preferred (rejected) is labeled as 0
         
         return item
     
@@ -109,10 +131,15 @@ def load_dataset(dataset_config: DatasetConfig, splits = SPLITS, has_bow=False):
 
 def load(emb_file_name: str, texts_file_name: str, df_file_name: str, bow_file_name: str = None):
     emb = np.load(emb_file_name)
-    bow = None
-    if bow_file_name:
-        print(f"Loading BOW embeddings from {bow_file_name}")
-        bow = np.load(bow_file_name) 
+    bow_path = None
+    print(f"Loading BOW embeddings from {bow_file_name}")
+    # Check if it's sparse or dense
+    if bow_file_name.endswith('.npz'):
+        bow = sparse.load_npz(bow_file_name)  # Load sparse
+        print(f"Loaded sparse BoW with shape {bow.shape}")
+    else:
+        bow = np.load(bow_file_name)  # Load dense
+        print(f"Loaded dense BoW with shape {bow.shape}")
     texts = json.load(open(texts_file_name))
     if df_file_name.endswith('.parquet'):
         df = pd.read_parquet(df_file_name)
@@ -128,12 +155,14 @@ def create_torch_dataset(args, splits = SPLITS):
     has_bow = getattr(args, 'has_bow', False)
     dts_raw = load_dataset(dts_cfg, splits, has_bow)
     dts = {}
-    for split in splits:
+    for split in splits:        
         if split in dts_raw.keys():
             print(f"Creating dataset for split: {split}")            
             dts[split] = PreferenceDataset(dts_raw[split]['df'], 
                                            dts_raw[split]['embeddings'], 
-                                           bow_embeddings=dts_raw[split]['bow']
+                                           bow_embeddings=dts_raw[split]['bow'],
+                                           prefix_columns=dts_cfg.prefix_columns,
+                                           split=split
                                            )
             print(f"Dataset {split} size: {len(dts[split])}")
     return dts

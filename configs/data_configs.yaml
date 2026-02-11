@@ -30,34 +30,42 @@ psoup:
 
   vocab_file: vocab.txt
 
+  prefix_columns: ["user_"]
+
   train:
-    df_file: psoup_train_with_emb_uid.parquet
+    df_file: psoup_train_with_emb_uid_user_ohe.parquet
     text_file: texts_train.json
     emb_file: emb_train.npy  
-    bow_file: bow_train.npy
+    bow_file: bow_train.npz
 
   test:
-    df_file: psoup_test_with_emb_uid.parquet   
+    df_file: psoup_test_with_emb_uid_user_ohe.parquet   
     text_file: texts_test.json
     emb_file: emb_test.npy
-    bow_file: bow_test.npy
+    bow_file: bow_test.npz
 
 simpler:
   dts_name: simpler
-  dts_path: /home/thiagodepaulo/exp/delta/data/simpler
-  dts_file: /home/thiagodepaulo/exp/delta/data/simpler/dataset_pairwise_preferences.jsonl
+  dts_path: /home/thiagodepaulo/exp/delta/data/simpler  
+
+  vocab_file: vocab.txt
+
+  prefix_columns: ["user_"]
 
   train: 
-    df_file: df_train.jsonl
+    df_file: dataset_pairwise_preferences_train_with_emb_and_ohe.parquet
     text_file: texts_train.json
     emb_file: emb_train.npy
+    bow_file: bow_train.npz
 
   dev:
-    df_file: df_dev.jsonl
+    df_file: dataset_pairwise_preferences_dev_with_emb_and_ohe.parquet
     text_file: texts_dev.json
     emb_file: emb_dev.npy
+    bow_file: bow_dev.npz
 
   test:
-    df_file: df_test.jsonl
+    df_file: dataset_pairwise_preferences_test_with_emb_and_ohe.parquet
     text_file: texts_test.json
     emb_file: emb_test.npy
+    bow_file: bow_test.npz
