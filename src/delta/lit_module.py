@@ -23,7 +23,7 @@ class PrefModule(L.LightningModule):
             p.requires_grad = False
         
         print(argparse.Namespace(**trainer_config.model_dump()))            
-        self.save_hyperparameters(argparse.Namespace(**trainer_config.model_dump()))
+        self.save_hyperparameters(argparse.Namespace(**trainer_config.model_dump()))        
         
     def compute_loss(self, batch):
                 
@@ -38,17 +38,19 @@ class PrefModule(L.LightningModule):
         out_delta_w = self.delta_model(batch_w)        
         out_delta_l = self.delta_model(batch_l)
                 
-        recon_loss = (out_delta_w['loss'] + out_delta_l['loss'])
+        delta_loss = (out_delta_w['loss'] + out_delta_l['loss'])
         nl_loss = (out_delta_w['nl_loss'] + out_delta_l['nl_loss'])
         ll_loss = (out_delta_w['ll_loss'] + out_delta_l['ll_loss'])
         kld_loss = (out_delta_w['kld_loss'] + out_delta_l['kld_loss'])
+        
                           
         diff_delta = out_delta_w["logits"] - out_delta_l["logits"]
         z = diff_r_star + diff_delta
         bt_loss = F.softplus(-z).mean()
         
         # total loss
-        loss = (bt_loss + ll_loss) + (nl_loss + kld_loss)
+        lbd = 1e-3
+        loss = (lbd * delta_loss) + bt_loss #(bt_loss + ll_loss) + (nl_loss + kld_loss)
               
         # accuracy
         acc = (z > 0).float().mean()
@@ -57,14 +59,13 @@ class PrefModule(L.LightningModule):
         
         log = {       
             "loss": loss,                       
-            "bt_loss": bt_loss,
-            "recon_loss": recon_loss,            
+            "bt_loss": bt_loss,            
             "nl_loss": nl_loss,
             "ll_loss": ll_loss,
             "kld_loss": kld_loss,
             "acc": acc,
             "acc_r_star": acc_r_star,
-            "acc_delta": acc_delta,            
+            "acc_delta": acc_delta,                        
         } 
         
         return loss.mean(), log
@@ -94,26 +95,26 @@ class PrefModule(L.LightningModule):
     
     def validation_step(self, batch):        
         batch_wl = self.split_batch_for_pref(batch)
+        
         loss, log = self.compute_loss(batch_wl)
         bs = batch["u_id"].shape[0] if isinstance(batch, dict) and "u_id" in batch else 1
         self._log_split("val", log, batch_size=bs)        
         return loss
     
-    def on_train_epoch_start(self):
-        opt = self.optimizers()
-        lr = opt.param_groups[0]["lr"]
-        print(f"Epoch {self.current_epoch} | LR = {lr:.6e}")
+    #def on_train_epoch_start(self):
+    #    opt = self.optimizers()
+    #    lr = opt.param_groups[0]["lr"]
+        #print(f"Epoch {self.current_epoch} | LR = {lr:.6e}")
     
     def _log_split(self, split: str, log: Dict[str, torch.Tensor], batch_size: Optional[int] = None):
         self.log(f"{split}_loss", log["loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, batch_size=batch_size)
         self.log(f"{split}_acc", log["acc"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log(f"{split}_acc_r_star", log["acc_r_star"], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
         self.log(f"{split}_acc_delta", log["acc_delta"], on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-        self.log(f"{split}_bt_loss", log["bt_loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)        
-        self.log(f"{split}_recon_loss", log["recon_loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f"{split}_bt_loss", log["bt_loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)                
         self.log(f"{split}_ll_loss", log["ll_loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log(f"{split}_nl_loss", log["nl_loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log(f"{split}_kld_loss", log["kld_loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f"{split}_kld_loss", log["kld_loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)        
 
     def on_test_epoch_start(self):
         # 0 -> test, 1 -> test_unseen        

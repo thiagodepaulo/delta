@@ -10,6 +10,7 @@ class NTMConfig(BaseModel):
     n_labels: int
     n_prior_covars: int
     n_topic_covars: int
+    n_context_emb: Optional[int] = None
     classifier_layers: int
     use_interactions: bool
     l1_beta_reg: float
@@ -19,9 +20,10 @@ class NTMConfig(BaseModel):
     classify_from_covars: bool = True
     user_covars: bool = True
     topic_covar_names: Optional[list[str]] = None
-    eta_bn_prop = Optional[int] = 1
-    alpha = Optional[int] = 1
+    eta_bn_prop: Optional[int] = 1
+    alpha: Optional[int] = 1
     
+    device: Optional[str] = None
         
     @property
     def arch(self):

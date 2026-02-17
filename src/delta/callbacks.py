@@ -19,7 +19,7 @@ class BetaCallBack(L.Callback):
                 if beta < 0:
                     beta = 0.0
         model.eta_bn_prop = beta                    
-        print(f"Epoch {pl_module.current_epoch}: eta_bn_prop = {beta}")
+        #print(f"Epoch {pl_module.current_epoch}: eta_bn_prop = {beta}")
 
 
 class PrintNTMTopics(L.Callback):
@@ -29,7 +29,7 @@ class PrintNTMTopics(L.Callback):
     attach the callback to the Trainer via `callbacks=[PrintNTMTopics(vocab)]`.
     """
 
-    def __init__(self, vocab, n_pos: int = 8, n_neg: int = 5, sparsity_threshold: float = 1e-5, every_n_epochs: int = 1, print_bg: bool = True):
+    def __init__(self, vocab, n_pos: int = 8, n_neg: int = 5, sparsity_threshold: float = 1e-5, every_n_epochs: int = 1, print_bg: bool = False):
         self.vocab = vocab
         self.n_pos = n_pos
         self.n_neg = n_neg
@@ -41,8 +41,8 @@ class PrintNTMTopics(L.Callback):
         # Delegate printing to the common print_weights helper.
         try:
             options = SimpleNamespace(
-                no_bg=not self.print_bg,
-                n_topics=getattr(getattr(model, 'config', None), 'n_topics', None),
+                no_bg=self.print_bg,
+                n_topics=model.n_topics,
                 output_dir=None,
                 interactions=False,
             )

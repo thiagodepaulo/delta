@@ -106,8 +106,8 @@ class PreferenceDataset(Dataset):
                 item[k] = torch.tensor(bow_vector, dtype=torch.float)
                 
         ## create y labels for preferred (chosen) vs non-preferred (rejected)        
-        item['chosen_label'] = torch.tensor([1.0], dtype=torch.float) if self.split == "train" else torch.zeros(1)  # Preferred (chosen) is labeled as 1
-        item['rejected_label'] = torch.tensor([0.0], dtype=torch.float) if self.split == "train" else torch.zeros(1)  # Non-preferred (rejected) is labeled as 0
+        item['chosen_label'] = torch.tensor([0.0, 1.0], dtype=torch.float) #if self.split == "train" else torch.zeros(1)  # Preferred (chosen) is labeled as 1
+        item['rejected_label'] = torch.tensor([1.0, 0.0], dtype=torch.float) #if self.split == "train" else torch.zeros(1)  # Non-preferred (rejected) is labeled as 0
         
         return item
     
@@ -166,6 +166,20 @@ def create_torch_dataset(args, splits = SPLITS):
                                            )
             print(f"Dataset {split} size: {len(dts[split])}")
     return dts
+
+def load_dataset_files(dataset_config_file, dts_name, has_bow=True, splits = SPLITS):
+    dataset_config = load_dataset_config(dataset_config_file, dts_name)
+    files = {}
+    for split in splits:
+        split_cfg = getattr(dataset_config, split)
+        if split_cfg is not None:
+            files[split] = {
+                'emb_file': os.path.join(dataset_config.dts_path or '', split_cfg.emb_file),
+                'text_file': os.path.join(dataset_config.dts_path or '', split_cfg.text_file),
+                'df_file': os.path.join(dataset_config.dts_path or '', split_cfg.df_file),
+                'bow_file': os.path.join(dataset_config.dts_path or '', split_cfg.bow_file) if has_bow else None
+            }
+    return files
 
 def load_vocab(dataset_config_file, dts_name):
     dts_cfg = load_dataset_config(dataset_config_file, dts_name)

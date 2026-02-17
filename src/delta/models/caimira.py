@@ -48,23 +48,13 @@ class CaimiraModel(BaseDeltaModel):
         loss_reg_d = self.config.lambda_d * self.layer_d.weight.abs().sum()
         reg_loss = loss_reg_s + loss_reg_d
         
-        rec_loss = torch.tensor(0.0)  # no reconstruction loss in this model        
         
-        return {'logits': logits, 's': s, 'd': d_norm, 'r': r_norm, 'reg_loss': reg_loss, 'recon_loss': rec_loss}
+        
+        # rec_loss = torch.tensor(0.0)  # no reconstruction loss in this model        
+        
+        return {'logits': logits, 's': s, 'd': d_norm, 'r': r_norm, 'reg_loss': reg_loss}
 
-    def compute_regularization( self ) :
-        
-        loss_reg_s = self.config.lambda_s * self.layer_s.weight.abs().sum()
-        loss_reg_d = self.config.lambda_d * self.layer_d.weight.abs().sum()
-        
-        logs = {
-            "loss_reg_s": loss_reg_s,
-            "loss_reg_d": loss_reg_d,
-        }
-        
-        total_loss = loss_reg_s + loss_reg_d
-        
-        return total_loss, logs    
+   
 
 
 

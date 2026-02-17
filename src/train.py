@@ -2,7 +2,7 @@ import sys
 import argparse
 from torch.utils.data import Dataset, DataLoader
 import lightning as L
-from lightning.pytorch.callbacks import EarlyStopping
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
 from delta.lit_module import PrefModule, PrefDataModule
 from delta.utils.config_utils import load_config
@@ -30,7 +30,7 @@ def main(args):
     parser.add_argument("--n_dim", type=int, default=50, help="Number of dimensions")
     parser.add_argument("--has_bow", action='store_true', default=False, help="Whether to use BOW embeddings")
     parser.add_argument("--print_topics", action='store_true', default=True, help="Whether to print NTM topics during training")
-    parser.add_argument("--print_topics_every_n_epochs", type=int, default=1, help="How often to print NTM topics during training (in epochs)")
+    parser.add_argument("--print_topics_every_n_epochs", type=int, default=100, help="How often to print NTM topics during training (in epochs)")
     parser.add_argument("--num_workers", type=int, default=4, help="Number of workers for data loading")
     args = parser.parse_args()
     
@@ -95,8 +95,7 @@ def create_model(args, config_dict):
         
         ntm_config.vocab_size = args.vocab_size  # Set vocab size from loaded vocab     
         ntm_config.n_topic_covars = args.n_features
-        ntm_config.topic_covar_names = args.feature_columns
-        #ntm_config.n_labels = 2  # Binary classification (preferred vs non-preferred)
+        ntm_config.topic_covar_names = args.feature_columns        
         model_instance = NTMModel(ntm_config)
     else:
         raise ValueError(f"Unknown model name: {args.model_name}")
@@ -126,9 +125,20 @@ def create_callbacks(args):
         patience=args.patience,           # epochs with no improvement
         mode="min",           # "min" for loss, "max" for accuracy
     )    
-            
     callbacks.append(early_stop)
+    
+    checkpoint_callback = ModelCheckpoint(
+        dirpath="checkpoints/",
+        filename="best",
+        monitor="val_loss",
+        mode="min",
+        save_top_k=1,
+    )
+    callbacks.append(checkpoint_callback)
+    
     return callbacks
-            
+
+## 317
+## 327            
 if __name__ == "__main__":
     main(sys.argv[1:])
